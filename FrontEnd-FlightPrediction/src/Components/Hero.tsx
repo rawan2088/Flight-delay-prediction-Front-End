@@ -55,9 +55,9 @@ const Hero: React.FC = () => {
           >
             Try Prediction Now
           </button>
-          <button className="px-8 py-4 bg-slate-800 text-white text-lg font-semibold rounded-lg hover:bg-slate-700 transition-all border border-slate-700">
+          <a className="px-8 py-4 bg-slate-800 text-white text-lg font-semibold rounded-lg hover:bg-slate-700 transition-all border border-slate-700">
             Learn More
-          </button>
+          </a>
         </div>
       </div>
     </section>

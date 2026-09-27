@@ -3,7 +3,9 @@ import AutocompleteInput from "../data/Autocomplete";
 import { AIRLINES } from "../data/airlinesData";
 import { AIRPORTS } from "../data/airportsData";
 
-const API_URL = "https://flight-delay-prediction-system.fly.dev/predict";
+const API_BASE = "http://127.0.0.1:8000/";
+const PREDICT_URL = `${API_BASE}/api/predictions/predict/`;
+const WARMUP_URL = `${API_BASE}/api/predictions/predict/warmup/`;
 
 function timeToMinutes(timeStr: string): number {
   const [time, modifier] = timeStr.split(" ");
@@ -18,37 +20,29 @@ function timeToMinutes(timeStr: string): number {
   return hours * 60 + minutes;
 }
 
-// function estimateDistance(origin: string, destination: string): number {
-//   // TODO: Add real distance calculation or lookup table
-//   // For now, return default
-//   return 1000;
-// }
-
 interface FormData {
-  // Airport codes
   originAirport: string;
   destinationAirport: string;
-
-  // Airline
   airline: string;
-
-  // Date fields
   year: string;
   month: string;
   day: string;
   dayOfWeek: string;
-
-  // Time and delay
   departureDelay: string;
   scheduledTime: string;
-
-  // Distance
   distance: string;
 }
 
 interface PredictionResult {
   prediction: string;
   error?: string;
+}
+
+// NOTE: replace this with however your app actually stores the JWT
+// (an AuthContext, a hook, wherever login() saves the tokens). This is
+// just a stand-in so the request is authenticated.
+function getAccessToken(): string | null {
+  return localStorage.getItem("access_token");
 }
 
 const PredictionForm: React.FC = () => {
@@ -70,9 +64,10 @@ const PredictionForm: React.FC = () => {
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
-    fetch(API_URL, {
-      method: "POST",
-    }).catch(() => {});
+    // Wake up the ML service's Fly.io machine if it's asleep. This hits
+    // OUR backend's public warmup endpoint (no auth needed, no prediction
+    // data returned) rather than the ML host directly.
+    fetch(WARMUP_URL, { method: "POST" }).catch(() => {});
   }, []);
 
   const handleChange = (
@@ -91,38 +86,45 @@ const PredictionForm: React.FC = () => {
     setPrediction(null);
 
     try {
-      // Convert form data to API format
+      const token = getAccessToken();
+      if (!token) {
+        throw new Error("You need to be logged in to run a prediction.");
+      }
+
+      // Clean, snake_case payload — our own API's contract, not the ML
+      // model's training column names. The backend translates this into
+      // whatever shape the ML service needs.
       const apiPayload = {
-        ORIGIN_AIRPORT: formData.originAirport.toUpperCase(),
-        DESTINATION_AIRPORT: formData.destinationAirport.toUpperCase(),
-        AIRLINE: formData.airline.toUpperCase(),
-        YEAR: parseInt(formData.year),
-        MONTH: parseInt(formData.month),
-        DAY: parseInt(formData.day),
-        DAY_OF_WEEK: parseInt(formData.dayOfWeek),
-        DEPARTURE_DELAY: parseInt(formData.departureDelay),
-        SCHEDULED_TIME: timeToMinutes(formData.scheduledTime),
-        DISTANCE: parseInt(formData.distance),
+        origin_airport: formData.originAirport.toUpperCase(),
+        destination_airport: formData.destinationAirport.toUpperCase(),
+        airline: formData.airline.toUpperCase(),
+        year: parseInt(formData.year),
+        month: parseInt(formData.month),
+        day: parseInt(formData.day),
+        day_of_week: parseInt(formData.dayOfWeek),
+        departure_delay: parseInt(formData.departureDelay),
+        scheduled_time_minutes: timeToMinutes(formData.scheduledTime),
+        distance: parseInt(formData.distance),
       };
 
-      console.log("Sending to API:", apiPayload);
-
-      const response = await fetch(API_URL, {
+      const response = await fetch(PREDICT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(apiPayload),
       });
 
       if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
         throw new Error(
-          `API returned ${response.status}: ${response.statusText}`,
+          body.error ||
+            `API returned ${response.status}: ${response.statusText}`,
         );
       }
 
       const result = await response.json();
-      console.log("API response:", result);
 
       setPrediction({
         prediction: String(result.predicted_arrival_delay_minutes ?? "Unknown"),
@@ -378,7 +380,6 @@ const PredictionForm: React.FC = () => {
           Prediction Results
         </h3>
 
-        {/* Loading State */}
         {isLoading && (
           <div className="text-center py-4">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
@@ -386,7 +387,6 @@ const PredictionForm: React.FC = () => {
           </div>
         )}
 
-        {/* Error State */}
         {error && !isLoading && (
           <div className="p-3 sm:p-4 bg-red-500/20 border border-red-500 rounded-lg">
             <p className="text-red-300 font-semibold mb-2 text-sm sm:text-base">
@@ -396,7 +396,6 @@ const PredictionForm: React.FC = () => {
           </div>
         )}
 
-        {/* Success State */}
         {prediction && !isLoading && !error && (
           <div className="space-y-3">
             <div className="p-3 sm:p-4 bg-slate-800 rounded-lg">
@@ -428,7 +427,6 @@ const PredictionForm: React.FC = () => {
           </div>
         )}
 
-        {/* Empty State */}
         {!prediction && !isLoading && !error && (
           <div className="text-center py-6 sm:py-8">
             <p className="text-gray-400 text-xs sm:text-sm">
@@ -442,7 +440,6 @@ const PredictionForm: React.FC = () => {
         )}
       </div>
 
-      {/* Helper Info Box */}
       <div className="mt-4 p-3 sm:p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
         <p className="text-blue-300 text-xs sm:text-sm font-semibold mb-2">
           💡 Quick Tips:
