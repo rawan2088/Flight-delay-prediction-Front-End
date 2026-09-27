@@ -3,7 +3,10 @@ import AutocompleteInput from "../data/Autocomplete";
 import { AIRLINES } from "../data/airlinesData";
 import { AIRPORTS } from "../data/airportsData";
 
-const API_BASE = "http://127.0.0.1:8000/";
+// ! temp
+const API_BASE = "http://127.0.0.1:8000";
+// const API_BASE = "https://flightprediction-backend.fly.dev/";
+
 const PREDICT_URL = `${API_BASE}/api/predictions/predict/`;
 const WARMUP_URL = `${API_BASE}/api/predictions/predict/warmup/`;
 
