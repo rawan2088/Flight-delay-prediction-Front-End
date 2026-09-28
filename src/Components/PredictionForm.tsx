@@ -1,458 +1,298 @@
 import React, { useState, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
 import AutocompleteInput from "../data/Autocomplete";
 import { AIRLINES } from "../data/airlinesData";
 import { AIRPORTS } from "../data/airportsData";
+import { authFetch, errorMessage, PREDICTIONS_URL } from "../utils/api";
+import { describeDelay, TONE_CLASSES } from "../utils/format";
 
-// ! temp
-const API_BASE = "http://127.0.0.1:8000";
-// const API_BASE = "https://flightprediction-backend.fly.dev/";
+const inputCls =
+  "w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors";
 
-const PREDICT_URL = `${API_BASE}/api/predictions/predict/`;
-const WARMUP_URL = `${API_BASE}/api/predictions/predict/warmup/`;
+// Plain-language distance presets, so nobody needs to know exact miles
+const DISTANCES = [
+  { label: "Short hop", hint: "under 500 mi", miles: 300 },
+  { label: "Regional", hint: "about 1,000 mi", miles: 1000 },
+  { label: "Cross-country", hint: "about 2,500 mi", miles: 2500 },
+  { label: "Very long", hint: "4,000+ mi", miles: 4000 },
+];
 
-function timeToMinutes(timeStr: string): number {
-  const [time, modifier] = timeStr.split(" ");
-  let [hours, minutes] = time.split(":").map(Number);
-
-  if (modifier === "PM" && hours !== 12) {
-    hours += 12;
-  } else if (modifier === "AM" && hours === 12) {
-    hours = 0;
-  }
-
-  return hours * 60 + minutes;
-}
-
-interface FormData {
-  originAirport: string;
-  destinationAirport: string;
-  airline: string;
-  year: string;
-  month: string;
-  day: string;
-  dayOfWeek: string;
-  departureDelay: string;
-  scheduledTime: string;
-  distance: string;
-}
-
-interface PredictionResult {
-  prediction: string;
-  error?: string;
-}
-
-// NOTE: replace this with however your app actually stores the JWT
-// (an AuthContext, a hook, wherever login() saves the tokens). This is
-// just a stand-in so the request is authenticated.
-function getAccessToken(): string | null {
-  return localStorage.getItem("access_token");
-}
+const Step: React.FC<{
+  n: number;
+  title: string;
+  help: string;
+  children: React.ReactNode;
+}> = ({ n, title, help, children }) => (
+  <fieldset className="space-y-3">
+    <legend className="flex items-center gap-3 mb-1">
+      <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">
+        {n}
+      </span>
+      <span className="text-lg font-semibold text-white">{title}</span>
+    </legend>
+    <p className="text-sm text-gray-400 -mt-1">{help}</p>
+    {children}
+  </fieldset>
+);
 
 const PredictionForm: React.FC = () => {
-  const [formData, setFormData] = useState<FormData>({
-    originAirport: "",
-    destinationAirport: "",
-    airline: "",
-    year: "2026",
-    month: "",
-    day: "",
-    dayOfWeek: "",
-    departureDelay: "0",
-    scheduledTime: "",
-    distance: "",
-  });
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [airline, setAirline] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [time, setTime] = useState("");
+  const [distance, setDistance] = useState("");
+  const [delay, setDelay] = useState("0");
+  const [advanced, setAdvanced] = useState(false);
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
-  const [error, setError] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [minutes, setMinutes] = useState<number | null>(null);
 
+  // Wake the ML service (sleeping Fly.io machine) as soon as the page opens
   useEffect(() => {
-    // Wake up the ML service's Fly.io machine if it's asleep. This hits
-    // OUR backend's public warmup endpoint (no auth needed, no prediction
-    // data returned) rather than the ML host directly.
-    fetch(WARMUP_URL, { method: "POST" }).catch(() => {});
+    fetch(`${PREDICTIONS_URL}/predict/warmup/`, { method: "POST" }).catch(
+      () => {},
+    );
   }, []);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ): void => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError("");
-    setPrediction(null);
+    setMinutes(null);
 
+    // The autocomplete shows text even when nothing was picked, so check codes
+    if (!origin || !destination || !airline) {
+      setError("Pick your airports and airline from the suggestions list.");
+      return;
+    }
+    if (origin === destination) {
+      setError("Departure and arrival airports must be different.");
+      return;
+    }
+
+    // Derive everything the API needs from a date and a time
+    const [y, m, d] = date.split("-").map(Number);
+    const [hh, mm] = time.split(":").map(Number);
+    const dayOfWeek = (new Date(y, m - 1, d).getDay() + 6) % 7; // Monday = 0
+
+    setLoading(true);
     try {
-      const token = getAccessToken();
-      if (!token) {
-        throw new Error("You need to be logged in to run a prediction.");
-      }
-
-      // Clean, snake_case payload — our own API's contract, not the ML
-      // model's training column names. The backend translates this into
-      // whatever shape the ML service needs.
-      const apiPayload = {
-        origin_airport: formData.originAirport.toUpperCase(),
-        destination_airport: formData.destinationAirport.toUpperCase(),
-        airline: formData.airline.toUpperCase(),
-        year: parseInt(formData.year),
-        month: parseInt(formData.month),
-        day: parseInt(formData.day),
-        day_of_week: parseInt(formData.dayOfWeek),
-        departure_delay: parseInt(formData.departureDelay),
-        scheduled_time_minutes: timeToMinutes(formData.scheduledTime),
-        distance: parseInt(formData.distance),
-      };
-
-      const response = await fetch(PREDICT_URL, {
+      const res = await authFetch(`${PREDICTIONS_URL}/predict/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(apiPayload),
+        body: JSON.stringify({
+          origin_airport: origin,
+          destination_airport: destination,
+          airline,
+          year: y,
+          month: m,
+          day: d,
+          day_of_week: dayOfWeek,
+          departure_delay: parseInt(delay) || 0,
+          scheduled_time_minutes: hh * 60 + mm,
+          distance: parseInt(distance),
+        }),
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(
-          body.error ||
-            `API returned ${response.status}: ${response.statusText}`,
-        );
-      }
-
-      const result = await response.json();
-
-      setPrediction({
-        prediction: String(result.predicted_arrival_delay_minutes ?? "Unknown"),
-      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok)
+        throw new Error(errorMessage(body, `Request failed (${res.status})`));
+      setMinutes(Number(body.predicted_arrival_delay_minutes));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to get prediction");
-      console.error("Error:", err);
+      setError(
+        err instanceof Error ? err.message : "Could not get a prediction",
+      );
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const formatPrediction = (p: PredictionResult | null) => {
-    if (!p) return "";
-    const num = Number(p.prediction);
-    if (!Number.isFinite(num)) return String(p.prediction);
-    return num < 0
-      ? `${Math.abs(num).toFixed(2)} minutes early`
-      : `${num.toFixed(2)} minutes delayed`;
-  };
+  const result = minutes !== null ? describeDelay(minutes) : null;
+  const airlineName = AIRLINES.find((a) => a.code === airline)?.label;
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-4 sm:p-8 shadow-2xl">
-      <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
-        {/* Airport Information */}
-        <div>
-          <h3 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4 border-b border-slate-700 pb-2">
-            Airport Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div>
-              <AutocompleteInput
-                label="Origin Airport"
-                name="originAirport"
-                value={formData.originAirport}
-                onChange={(code) =>
-                  setFormData({ ...formData, originAirport: code })
-                }
-                options={AIRPORTS}
-                placeholder="Type to search airports..."
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                3-letter airport code
-              </p>
-            </div>
-
-            <div>
-              <AutocompleteInput
-                label="Destination Airport"
-                name="destinationAirport"
-                value={formData.destinationAirport}
-                onChange={(code) =>
-                  setFormData({ ...formData, destinationAirport: code })
-                }
-                options={AIRPORTS}
-                placeholder="Type to search airports..."
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                3-letter airport code
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Airline Information */}
-        <div>
-          <h3 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4 border-b border-slate-700 pb-2">
-            Airline Information
-          </h3>
-          <div>
+    <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-5 sm:p-8 shadow-2xl">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <Step
+          n={1}
+          title="Where are you flying?"
+          help="Type a city, airport name or code, then pick from the list."
+        >
+          <div className="grid md:grid-cols-2 gap-4">
             <AutocompleteInput
-              label="Airline"
-              name="airline"
-              value={formData.airline}
-              onChange={(code) => setFormData({ ...formData, airline: code })}
-              options={AIRLINES}
-              placeholder="Type to search airlines..."
+              label="From"
+              name="origin"
+              value={origin}
+              onChange={setOrigin}
+              options={AIRPORTS}
+              placeholder="e.g. New York"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">2-letter airline code</p>
+            <AutocompleteInput
+              label="To"
+              name="destination"
+              value={destination}
+              onChange={setDestination}
+              options={AIRPORTS}
+              placeholder="e.g. Los Angeles"
+              required
+            />
           </div>
-        </div>
+        </Step>
 
-        {/* Date and Time Information */}
-        <div>
-          <h3 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4 border-b border-slate-700 pb-2">
-            Date & Time Information
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+        <Step n={2} title="Which airline?" help="Search by airline name.">
+          <AutocompleteInput
+            label="Airline"
+            name="airline"
+            value={airline}
+            onChange={setAirline}
+            options={AIRLINES}
+            placeholder="e.g. Delta"
+            required
+          />
+        </Step>
+
+        <Step
+          n={3}
+          title="When does it depart?"
+          help="Use the scheduled time on your ticket."
+        >
+          <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                Year *
+              <label
+                htmlFor="date"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
+                Date
               </label>
               <input
-                type="number"
-                name="year"
-                value={formData.year}
-                onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="2026"
-                min="2015"
-                max="2030"
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={inputCls}
                 required
               />
             </div>
-
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                Month *
-              </label>
-              <select
-                name="month"
-                value={formData.month}
-                onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                required
+              <label
+                htmlFor="time"
+                className="block text-sm font-medium text-gray-300 mb-2"
               >
-                <option value="">Select Month</option>
-                <option value="1">Jan (1)</option>
-                <option value="2">Feb (2)</option>
-                <option value="3">Mar (3)</option>
-                <option value="4">Apr (4)</option>
-                <option value="5">May (5)</option>
-                <option value="6">Jun (6)</option>
-                <option value="7">Jul (7)</option>
-                <option value="8">Aug (8)</option>
-                <option value="9">Sep (9)</option>
-                <option value="10">Oct (10)</option>
-                <option value="11">Nov (11)</option>
-                <option value="12">Dec (12)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                Day *
+                Departure time
               </label>
               <input
-                type="number"
-                name="day"
-                value={formData.day}
-                onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="15"
-                min="1"
-                max="31"
-                required
-              />
-            </div>
-
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                Day of Week *
-              </label>
-              <select
-                name="dayOfWeek"
-                value={formData.dayOfWeek}
-                onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                required
-              >
-                <option value="">Select Day</option>
-                <option value="0">Mon (0)</option>
-                <option value="1">Tue (1)</option>
-                <option value="2">Wed (2)</option>
-                <option value="3">Thu (3)</option>
-                <option value="4">Fri (4)</option>
-                <option value="5">Sat (5)</option>
-                <option value="6">Sun (6)</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                0 = Monday, 6 = Sunday
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                Scheduled Time *
-              </label>
-              <input
+                id="time"
                 type="time"
-                name="scheduledTime"
-                value={formData.scheduledTime}
-                onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className={inputCls}
                 required
               />
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                Departure Delay
-              </label>
-              <input
-                type="number"
-                name="departureDelay"
-                value={formData.departureDelay}
-                onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="0"
-                min="0"
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Usually 0 for predictions
-              </p>
             </div>
           </div>
-        </div>
+        </Step>
 
-        {/* Flight Details */}
+        <Step
+          n={4}
+          title="How long is the flight?"
+          help="Pick the closest match, or type the exact miles."
+        >
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {DISTANCES.map((o) => (
+              <button
+                key={o.miles}
+                type="button"
+                onClick={() => setDistance(String(o.miles))}
+                className={`p-3 rounded-lg border text-left transition-colors ${
+                  distance === String(o.miles)
+                    ? "border-blue-500 bg-blue-500/15"
+                    : "border-slate-700 bg-slate-900 hover:border-slate-500"
+                }`}
+              >
+                <span className="block text-sm font-semibold text-white">
+                  {o.label}
+                </span>
+                <span className="block text-xs text-gray-400">{o.hint}</span>
+              </button>
+            ))}
+          </div>
+          <input
+            type="number"
+            min="1"
+            value={distance}
+            onChange={(e) => setDistance(e.target.value)}
+            className={inputCls}
+            placeholder="Distance in miles"
+            aria-label="Distance in miles"
+            required
+          />
+        </Step>
+
         <div>
-          <h3 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4 border-b border-slate-700 pb-2">
-            Flight Details
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                Distance (miles) *
+          <button
+            type="button"
+            onClick={() => setAdvanced((a) => !a)}
+            className="flex items-center gap-1 text-sm text-gray-400 hover:text-white"
+          >
+            <ChevronDown
+              className={`w-4 h-4 transition-transform ${advanced ? "rotate-180" : ""}`}
+            />
+            Already delayed at departure?
+          </button>
+          {advanced && (
+            <div className="mt-3">
+              <label
+                htmlFor="delay"
+                className="block text-sm font-medium text-gray-300 mb-2"
+              >
+                Minutes late leaving the gate
               </label>
               <input
+                id="delay"
                 type="number"
-                name="distance"
-                value={formData.distance}
-                onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="2475"
                 min="0"
-                required
+                value={delay}
+                onChange={(e) => setDelay(e.target.value)}
+                className={inputCls}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Flight distance in miles
+                Leave at 0 if you haven't left yet.
               </p>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Submit Button */}
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full py-3 sm:py-4 bg-blue-600 text-sm sm:text-lg font-semibold rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] shadow-lg shadow-blue-500/30"
+          disabled={loading}
+          className="w-full py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
         >
-          {isLoading ? "Predicting..." : "Predict Flight Delay"}
+          {loading ? "Predicting..." : "Predict my delay"}
         </button>
       </form>
 
-      {/* Results Section */}
-      <div className="mt-6 sm:mt-8 p-4 sm:p-6 bg-slate-900/50 rounded-lg border border-slate-700">
-        <h3 className="text-base sm:text-lg font-semibold text-white mb-4">
-          Prediction Results
-        </h3>
-
-        {isLoading && (
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            <p className="text-blue-400 text-sm">Analyzing flight data...</p>
+      <div aria-live="polite" className="mt-6">
+        {error && (
+          <div
+            role="alert"
+            className="p-4 bg-rose-500/15 border border-rose-500/50 rounded-lg text-rose-200 text-sm"
+          >
+            {error}
           </div>
         )}
-
-        {error && !isLoading && (
-          <div className="p-3 sm:p-4 bg-red-500/20 border border-red-500 rounded-lg">
-            <p className="text-red-300 font-semibold mb-2 text-sm sm:text-base">
-              Error
+        {result && !error && (
+          <div
+            className={`p-6 rounded-xl border text-center ${TONE_CLASSES[result.tone]}`}
+          >
+            <p className="text-sm opacity-80 mb-1">
+              {origin} to {destination} · {airlineName ?? airline} · {date}
             </p>
-            <p className="text-red-200 text-xs sm:text-sm">{error}</p>
-          </div>
-        )}
-
-        {prediction && !isLoading && !error && (
-          <div className="space-y-3">
-            <div className="p-3 sm:p-4 bg-slate-800 rounded-lg">
-              <p className="text-white mb-2 text-xs sm:text-sm">
-                <span className="font-semibold">Route:</span>{" "}
-                {formData.originAirport.toUpperCase()} →{" "}
-                {formData.destinationAirport.toUpperCase()}
-              </p>
-              <p className="text-white mb-2 text-xs sm:text-sm">
-                <span className="font-semibold">Airline:</span>{" "}
-                {formData.airline.toUpperCase()}
-              </p>
-              <p className="text-white text-xs sm:text-sm">
-                <span className="font-semibold">Date:</span> {formData.year}-
-                {formData.month}-{formData.day}
-              </p>
-            </div>
-
-            <div className="p-4 sm:p-6 bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border-2 border-blue-500/30">
-              <p className="text-white mb-3 text-center">
-                <span className="text-xs sm:text-sm font-semibold text-gray-400 block mb-2">
-                  PREDICTION
-                </span>
-                <span className="text-2xl sm:text-3xl font-bold text-purple-400 block mb-1">
-                  {formatPrediction(prediction)}
-                </span>
-              </p>
-            </div>
-          </div>
-        )}
-
-        {!prediction && !isLoading && !error && (
-          <div className="text-center py-6 sm:py-8">
-            <p className="text-gray-400 text-xs sm:text-sm">
-              Fill in all the flight details above and click "Predict Flight
-              Delay"
-            </p>
-            <p className="text-gray-500 text-xs mt-2">
-              All fields marked with * are required
+            <p className="text-4xl font-bold">{result.label}</p>
+            <p className="text-xs opacity-70 mt-2">
+              An estimate only. Always check with your airline.
             </p>
           </div>
         )}
-      </div>
-
-      <div className="mt-4 p-3 sm:p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-        <p className="text-blue-300 text-xs sm:text-sm font-semibold mb-2">
-          💡 Quick Tips:
-        </p>
-        <ul className="text-blue-200 text-xs space-y-1">
-          <li>• Airport codes are 3 letters (JFK, LAX, ORD)</li>
-          <li>• Airline codes are 2 letters (DL, UA, AA)</li>
-          <li>• Scheduled time in minutes: 6:00 AM = 360, 2:30 PM = 870</li>
-          <li>• Day of week: 0 = Monday, 6 = Sunday</li>
-        </ul>
       </div>
     </div>
   );

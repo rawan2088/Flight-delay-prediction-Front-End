@@ -1,104 +1,90 @@
 import React, { useState, useEffect } from "react";
-import type { User, RegisterData } from "./AuthContextType";
+import type { User, RegisterData, ProfileUpdate } from "./AuthContextType";
 import { AuthContext, API_URL } from "./AuthContextType";
+import { authFetch, errorMessage } from "../utils/api";
 
-// Provider component
+const clearTokens = () => {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check if user is logged in on mount
+  // Restore the session on page load
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      fetchUserProfile(token);
+    if (localStorage.getItem("refresh_token")) {
+      fetchUserProfile();
     } else {
       setLoading(false);
     }
   }, []);
 
-  // Fetch user profile from Django
-  const fetchUserProfile = async (token: string) => {
+  // authFetch refreshes an expired access token automatically
+  const fetchUserProfile = async () => {
     try {
-      const response = await fetch(`${API_URL}/profile/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data);
-      } else {
-        // Token invalid, clear it
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-      }
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      const res = await authFetch(`${API_URL}/profile/`);
+      if (res.ok) setUser(await res.json());
+      else clearTokens();
+    } catch {
+      clearTokens();
     } finally {
       setLoading(false);
     }
   };
 
-  // Login function
   const login = async (username: string, password: string) => {
-    const response = await fetch(`${API_URL}/login/`, {
+    const res = await fetch(`${API_URL}/login/`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(errorMessage(data, "Login failed"));
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || "Login failed");
-    }
-
-    const data = await response.json();
-
-    // Store tokens
     localStorage.setItem("access_token", data.access);
     localStorage.setItem("refresh_token", data.refresh);
-
-    // Fetch and set user profile
-    await fetchUserProfile(data.access);
+    await fetchUserProfile();
   };
 
-  // Register function
   const register = async (userData: RegisterData) => {
-    const response = await fetch(`${API_URL}/register/`, {
+    const res = await fetch(`${API_URL}/register/`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(userData),
     });
+    if (!res.ok) throw new Error(JSON.stringify(await res.json()));
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(JSON.stringify(errorData));
-    }
-
-    const data = await response.json();
-
-    // Store tokens
+    const data = await res.json();
     localStorage.setItem("access_token", data.tokens.access);
     localStorage.setItem("refresh_token", data.tokens.refresh);
-
-    // Set user
     setUser(data.user);
   };
 
-  // Logout function
+  const updateProfile = async (values: ProfileUpdate) => {
+    const res = await authFetch(`${API_URL}/profile/update/`, {
+      method: "PATCH",
+      body: JSON.stringify(values),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(errorMessage(data, "Update failed"));
+    setUser((prev) => (prev ? { ...prev, ...data } : prev));
+  };
+
   const logout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    // Blacklist the refresh token on the server (fire-and-forget).
+    // The request is built synchronously, before we clear storage below.
+    const refresh = localStorage.getItem("refresh_token");
+    if (refresh) {
+      authFetch(`${API_URL}/logout/`, {
+        method: "POST",
+        body: JSON.stringify({ refresh }),
+      }).catch(() => {});
+    }
+    clearTokens();
     setUser(null);
   };
 
@@ -109,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         login,
         register,
         logout,
+        updateProfile,
         isAuthenticated: !!user,
         loading,
       }}
@@ -117,6 +104,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     </AuthContext.Provider>
   );
 };
-
-// Custom hook to use auth context
-// can't export useContext directly

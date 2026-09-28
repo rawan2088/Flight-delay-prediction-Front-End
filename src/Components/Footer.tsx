@@ -32,7 +32,7 @@ const CONTRIBUTORS: Contributor[] = [
 
 const Footer: React.FC = () => {
   return (
-    <footer className="border-t border-slate-700 pt-8 pb-6 bg-slate-900">
+    <footer className="relative z-10 border-t border-slate-800 pt-8 pb-6 bg-[#030712]/80 backdrop-blur-sm">
       <div className="max-w-6xl mx-auto px-6">
         <div className="grid md:grid-cols-3 gap-6">
           {CONTRIBUTORS.map((c) => (
