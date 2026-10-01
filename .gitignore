@@ -1,24 +1,165 @@
+# ============================================
+# Dependencies
+# ============================================
+
+node_modules/
+.pnp/
+.pnp.js
+
+
+# ============================================
+# Build / Production
+# ============================================
+
+dist/
+dist-ssr/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+
+
+# ============================================
 # Logs
-logs
+# ============================================
+
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.log.*
 
-node_modules
-dist
-dist-ssr
+
+# ============================================
+# Environment Variables / Secrets
+# ============================================
+
+.env
+.env.*
+!.env.example
+
+
+# ============================================
+# Local / Temporary Files
+# ============================================
+
 *.local
+*.tmp
+*.temp
+.tmp/
+temp/
+.cache/
 
-# Editor directories and files
+
+# ============================================
+# IDE / Editors
+# ============================================
+
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+!.vscode/settings.json
+
+.idea/
+*.iml
+
+# Visual Studio
+.vs/
 *.suo
-*.ntvs*
+*.user
+*.userosscache
+*.sln.docstates
 *.njsproj
-*.sln
-*.sw?
+*.ntvs*
+*.ntvs_analysis.dat
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Sublime
+*.sublime-workspace
+*.sublime-project
+
+
+# ============================================
+# OS Files
+# ============================================
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+
+# ============================================
+# Testing / Coverage
+# ============================================
+
+coverage/
+.nyc_output/
+*.lcov
+
+
+# ============================================
+# TypeScript
+# ============================================
+
+*.tsbuildinfo
+
+
+# ============================================
+# ESLint / Tool Caches
+# ============================================
+
+.eslintcache
+.stylelintcache
+
+
+# ============================================
+# Storybook
+# ============================================
+
+storybook-static/
+
+
+# ============================================
+# Generated / Temporary Data
+# ============================================
+
+*.generated.*
+*.tgz
+
+
+# ============================================
+# Vite
+# ============================================
+
+.vite/
+
+
+# ============================================
+# Optional: Local certificates
+# ============================================
+
+*.pem
+*.key
+*.crt
+
+
+# ============================================
+# Optional: Generated files
+# ============================================
+
+*.bak
+*.orig
+*.rej

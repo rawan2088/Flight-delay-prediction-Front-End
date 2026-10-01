@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { useAuth } from "../Hooks/useAuth";
 import type { ProfileUpdate } from "../context/AuthContextType";
-import { authFetch, PREDICTIONS_URL } from "../utils/api";
+import { authFetch, PREDICTIONS_URL } from "../utils/Api";
+import FloatingInput from "../Components/FloatingInput";
 
 const ROLE_LABEL = {
   NORMAL: "Traveler",
@@ -72,7 +73,8 @@ const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pt-28 pb-12 px-4">
+    // <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pt-28 pb-12 px-4">
+    <div className="min-h-screen pt-28 pb-12 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <span className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-2xl font-bold text-white">
@@ -119,24 +121,15 @@ const ProfilePage: React.FC = () => {
           <h2 className="text-xl font-semibold text-white">Your details</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             {FIELDS.map((f) => (
-              <div key={f.name}>
-                <label
-                  htmlFor={f.name}
-                  className="block text-sm font-medium text-gray-300 mb-2"
-                >
-                  {f.label}
-                </label>
-                <input
-                  id={f.name}
-                  type={f.type ?? "text"}
-                  value={form[f.name]}
-                  onChange={(e) =>
-                    setForm({ ...form, [f.name]: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                  required
-                />
-              </div>
+              <FloatingInput
+                key={f.name}
+                id={f.name}
+                label={f.label}
+                type={f.type ?? "text"}
+                value={form[f.name]}
+                required
+                onChange={(e) => setForm({ ...form, [f.name]: e.target.value })}
+              />
             ))}
           </div>
           {msg && (

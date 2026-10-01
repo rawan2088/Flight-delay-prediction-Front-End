@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import { USERS_URL } from "../utils/api";
+import { USERS_URL } from "../utils/Api";
 
 export interface User {
   id: number;

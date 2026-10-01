@@ -3,11 +3,9 @@ import { ChevronDown } from "lucide-react";
 import AutocompleteInput from "../data/Autocomplete";
 import { AIRLINES } from "../data/airlinesData";
 import { AIRPORTS } from "../data/airportsData";
-import { authFetch, errorMessage, PREDICTIONS_URL } from "../utils/api";
-import { describeDelay, TONE_CLASSES } from "../utils/format";
-
-const inputCls =
-  "w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors";
+import { authFetch, errorMessage, PREDICTIONS_URL } from "../utils/Api";
+import { describeDelay, TONE_CLASSES } from "../utils/Format";
+import FloatingInput from "./FloatingInput";
 
 // Plain-language distance presets, so nobody needs to know exact miles
 const DISTANCES = [
@@ -157,35 +155,21 @@ const PredictionForm: React.FC = () => {
           help="Use the scheduled time on your ticket."
         >
           <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="date"
-                className="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Date
-              </label>
-              <input
-                id="date"
+            <div className="grid sm:grid-cols-2 gap-4">
+              <FloatingInput
+                label="Date"
                 type="date"
+                alwaysFloat
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className={inputCls}
                 required
               />
-            </div>
-            <div>
-              <label
-                htmlFor="time"
-                className="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Departure time
-              </label>
-              <input
-                id="time"
+              <FloatingInput
+                label="Departure time"
                 type="time"
+                alwaysFloat
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className={inputCls}
                 required
               />
             </div>
@@ -216,14 +200,13 @@ const PredictionForm: React.FC = () => {
               </button>
             ))}
           </div>
-          <input
+          <FloatingInput
+            label="Distance in miles"
             type="number"
             min="1"
+            inputMode="numeric"
             value={distance}
             onChange={(e) => setDistance(e.target.value)}
-            className={inputCls}
-            placeholder="Distance in miles"
-            aria-label="Distance in miles"
             required
           />
         </Step>
@@ -241,19 +224,14 @@ const PredictionForm: React.FC = () => {
           </button>
           {advanced && (
             <div className="mt-3">
-              <label
-                htmlFor="delay"
-                className="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Minutes late leaving the gate
-              </label>
-              <input
-                id="delay"
+              <FloatingInput
+                label="Minutes late leaving the gate"
                 type="number"
                 min="0"
+                inputMode="numeric"
                 value={delay}
                 onChange={(e) => setDelay(e.target.value)}
-                className={inputCls}
+                hint="Leave at 0 if you haven't left yet."
               />
               <p className="text-xs text-gray-500 mt-1">
                 Leave at 0 if you haven't left yet.

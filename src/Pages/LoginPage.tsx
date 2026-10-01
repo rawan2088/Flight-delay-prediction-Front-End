@@ -1,10 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation, Link, Navigate } from "react-router-dom";
-import { Eye, EyeOff, Plane } from "lucide-react";
+import { Loader2, Plane } from "lucide-react";
 import { useAuth } from "../Hooks/useAuth";
-
-const inputCls =
-  "w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors";
+import FloatingInput, { VisibilityToggle } from "../Components/FloatingInput";
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState("");
@@ -36,78 +34,58 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pt-28 pb-12 px-4">
-      <div className="max-w-md mx-auto bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-8">
-        <Plane className="w-10 h-10 text-blue-500 mx-auto mb-3" />
-        <h1 className="text-3xl font-bold text-white text-center">
+    <div className="flex min-h-screen items-center justify-center px-4 pb-8 pt-24">
+      <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800/50 p-6 backdrop-blur-sm sm:p-8">
+        <Plane className="mx-auto mb-3 h-10 w-10 text-blue-500" />
+        <h1 className="text-center text-3xl font-bold text-white">
           Welcome back
         </h1>
-        <p className="text-gray-400 text-center mt-1 mb-6">
+        <p className="mb-6 mt-1 text-center text-gray-400">
           Sign in to use the prediction agent.
         </p>
 
         {error && (
           <div
             role="alert"
-            className="mb-4 p-3 bg-rose-500/15 border border-rose-500/50 rounded-lg text-rose-200 text-sm"
+            className="mb-4 rounded-lg border border-rose-500/50 bg-rose-500/15 p-3 text-sm text-rose-200"
           >
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-sm font-medium text-gray-300 mb-2"
-            >
-              Username
-            </label>
-            <input
-              id="username"
-              className={inputCls}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-              required
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-300 mb-2"
-            >
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPw ? "text" : "password"}
-                className={`${inputCls} pr-12`}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
+          <FloatingInput
+            label="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            required
+          />
+          <FloatingInput
+            label="Password"
+            type={showPw ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            trailing={
+              <VisibilityToggle
+                shown={showPw}
+                onToggle={() => setShowPw((s) => !s)}
               />
-              <button
-                type="button"
-                onClick={() => setShowPw((s) => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                aria-label={showPw ? "Hide password" : "Show password"}
-              >
-                {showPw ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-          </div>
+            }
+            required
+          />
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-600"
           >
+            {submitting && (
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+            )}
             {submitting ? "Signing in..." : "Sign in"}
           </button>
         </form>

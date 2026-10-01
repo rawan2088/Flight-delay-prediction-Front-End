@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { authFetch, errorMessage, PREDICTIONS_URL } from "../utils/api";
-import { describeDelay, TONE_CLASSES } from "../utils/format";
+import { authFetch, errorMessage, PREDICTIONS_URL } from "../utils/Api";
+import { describeDelay, TONE_CLASSES } from "../utils/Format";
 
 interface Item {
   id: number;
@@ -52,7 +52,8 @@ const HistoryPage: React.FC = () => {
   const totalPages = data ? Math.max(1, Math.ceil(data.count / PAGE_SIZE)) : 1;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pt-28 pb-12 px-4 sm:px-6 lg:px-8">
+    // <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 pt-28 pb-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold text-white mb-2">Your predictions</h1>
         <p className="text-gray-400 mb-8">

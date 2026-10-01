@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useId } from "react";
+import { fieldCls, labelCls } from "../utils/Fieldstyles";
 
 interface Option {
   code: string;
@@ -28,6 +29,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputId = useId();
 
   // Compute display value from the code value
   const displayValue = useMemo(() => {
@@ -122,45 +124,51 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
     }
   };
 
+  const showBadge = !!value && !showSuggestions;
+
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="block text-sm font-medium text-gray-300 mb-2">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
+      <div className="relative">
+        <input
+          id={inputId}
+          type="text"
+          name={name}
+          value={renderedInputValue}
+          onChange={handleInputChange}
+          onFocus={() => {
+            setShowSuggestions(true);
+            setActiveIndex(-1);
+          }}
+          onKeyDown={handleKeyDown}
+          className={`${fieldCls()} ${showBadge ? "pr-16" : ""}`}
+          placeholder={placeholder || " "}
+          required={required}
+          autoComplete="off"
+          aria-autocomplete="list"
+          aria-expanded={showSuggestions}
+          aria-haspopup="listbox"
+        />
+        <label htmlFor={inputId} className={labelCls()}>
+          {label}
+        </label>
 
-      <input
-        type="text"
-        name={name}
-        value={renderedInputValue}
-        onChange={handleInputChange}
-        onFocus={() => {
-          setShowSuggestions(true);
-          setActiveIndex(-1);
-        }}
-        onKeyDown={handleKeyDown}
-        className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-        placeholder={placeholder}
-        required={required}
-        autoComplete="off"
-        aria-autocomplete="list"
-        aria-expanded={showSuggestions}
-        aria-haspopup="listbox"
-      />
+        {/* The chosen code lives inside the field instead of on its own line */}
+        {showBadge && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded bg-blue-600 px-2 py-1 text-xs font-bold text-white">
+            {value}
+          </span>
+        )}
+      </div>
 
       {/* Hidden input to store the actual code (include name so native forms pick it up) */}
       <input type="hidden" name={name} value={value} />
-
-      {/* Selected code display */}
-      {value && !showSuggestions && (
-        <div className="mt-1 text-xs text-green-400">Selected: {value}</div>
-      )}
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
         <div
           role="listbox"
           aria-label={`${label} suggestions`}
-          className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto scrollbar-custom sm:max-h-60 md:max-h-80"
+          className="absolute left-0 top-full z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-700 bg-slate-800 shadow-lg scrollbar-custom sm:max-h-60 md:max-h-80"
         >
           {suggestions.map((option, idx) => (
             <div
@@ -172,17 +180,17 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
                 e.preventDefault();
                 handleSuggestionClick(option);
               }}
-              className={`px-3 py-2 cursor-pointer border-b border-slate-700 last:border-b-0 transition-colors sm:px-4 sm:py-3 ${
+              className={`cursor-pointer border-b border-slate-700 px-3 py-2 transition-colors last:border-b-0 hover:bg-slate-700/60 sm:px-4 sm:py-3 ${
                 idx === activeIndex ? "bg-slate-700" : ""
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="text-white text-xs font-medium sm:text-sm truncate">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-medium text-white sm:text-sm">
                     {option.label}
                   </div>
                 </div>
-                <div className="px-2 py-1 bg-blue-600 text-white text-xs font-bold rounded flex-shrink-0">
+                <div className="flex-shrink-0 rounded bg-blue-600 px-2 py-1 text-xs font-bold text-white">
                   {option.code}
                 </div>
               </div>
@@ -193,8 +201,8 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
 
       {/* No results message */}
       {showSuggestions && inputValue && suggestions.length === 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg p-3 scrollbar-custom sm:p-4">
-          <p className="text-gray-400 text-xs sm:text-sm">
+        <div className="absolute left-0 top-full z-20 mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 shadow-lg sm:p-4">
+          <p className="text-xs text-gray-400 sm:text-sm">
             No matches found for "{inputValue}"
           </p>
         </div>

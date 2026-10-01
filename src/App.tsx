@@ -11,6 +11,19 @@ import HistoryPage from "./Pages/HistoryPage";
 import ProfilePage from "./Pages/ProfilePage";
 import { AuthProvider } from "./context/AuthContext";
 
+import StarField from "./Components/StarField";
+import { Outlet } from "react-router-dom";
+
+// Night sky behind whatever child route is rendered
+const StarLayout: React.FC = () => (
+  <div className="relative min-h-screen">
+    <StarField />
+    <div className="relative z-10">
+      <Outlet />
+    </div>
+  </div>
+);
+
 const App: React.FC = () => (
   <AuthProvider>
     <BrowserRouter>
@@ -18,13 +31,15 @@ const App: React.FC = () => (
         <Header />
         <main className="flex-grow">
           <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="/predict" element={<UserPage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
+            <Route element={<StarLayout />}>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/predict" element={<UserPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Route>
             </Route>
           </Routes>
         </main>

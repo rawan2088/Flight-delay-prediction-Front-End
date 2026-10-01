@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { User, RegisterData, ProfileUpdate } from "./AuthContextType";
 import { AuthContext, API_URL } from "./AuthContextType";
-import { authFetch, errorMessage } from "../utils/api";
+import { authFetch, errorMessage } from "../utils/Api";
 
 const clearTokens = () => {
   localStorage.removeItem("access_token");

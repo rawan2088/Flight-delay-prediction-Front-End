@@ -1,4 +1,5 @@
 // One place for the base URL + authenticated requests.
+// todo: should be changed to production level
 // Local dev: create .env with VITE_API_BASE=http://127.0.0.1:8000
 export const API_BASE: string =
   import.meta.env.VITE_API_BASE ?? "https://flightprediction-backend.fly.dev";

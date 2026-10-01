@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "../Hooks/useAuth";
+import FloatingInput, { VisibilityToggle } from "../Components/FloatingInput";
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -11,6 +13,7 @@ const RegisterPage: React.FC = () => {
     first_name: "",
     last_name: "",
   });
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -18,37 +21,41 @@ const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  // Tell people as they type, not only after they press the button
+  const mismatch =
+    formData.password2.length > 0 && formData.password !== formData.password2;
+
+  const toggle = (
+    <VisibilityToggle shown={showPw} onToggle={() => setShowPw((s) => !s)} />
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    // Validate passwords match
     if (formData.password !== formData.password2) {
       setError("Passwords don't match");
       return;
     }
 
     setLoading(true);
-
     try {
       await register(formData);
       navigate("/predict"); // Redirect after successful registration
-    } catch (err: Error | unknown) {
-      // Parse error message
+    } catch (err) {
+      // The server sends field errors as JSON; turn them into one readable line
       try {
         const errorObj = JSON.parse(
           err instanceof Error ? err.message : String(err),
         );
-        const errorMessages = Object.entries(errorObj)
-          .map(([key, value]) => `${key}: ${value}`)
-          .join(", ");
-        setError(errorMessages);
+        setError(
+          Object.entries(errorObj)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(", "),
+        );
       } catch {
         setError(
           (err instanceof Error ? err.message : String(err)) ||
@@ -61,122 +68,105 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 pt-24 pb-12 px-4">
-      <div className="max-w-md mx-auto">
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-8">
-          <h1 className="text-3xl font-bold text-white mb-6 text-center">
-            Register
-          </h1>
+    <div className="flex min-h-screen items-center justify-center px-4 pb-8 pt-24">
+      <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800/50 p-6 backdrop-blur-sm sm:p-8">
+        <h1 className="text-center text-3xl font-bold text-white">
+          Create your account
+        </h1>
+        <p className="mb-6 mt-1 text-center text-gray-400">
+          Sign up to start predicting.
+        </p>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-sm">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div
+            role="alert"
+            className="mb-4 rounded-lg border border-red-500 bg-red-500/20 p-3 text-sm text-red-300"
+          >
+            {error}
+          </div>
+        )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <FloatingInput
+              label="First name"
+              name="first_name"
+              value={formData.first_name}
+              onChange={handleChange}
+              autoComplete="given-name"
+              required
+            />
+            <FloatingInput
+              label="Last name"
+              name="last_name"
+              value={formData.last_name}
+              onChange={handleChange}
+              autoComplete="family-name"
+              required
+            />
+          </div>
+          <FloatingInput
+            label="Username"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            required
+          />
+          <FloatingInput
+            label="Email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            autoComplete="email"
+            autoCapitalize="none"
+            required
+          />
+          <FloatingInput
+            label="Password"
+            name="password"
+            type={showPw ? "text" : "password"}
+            value={formData.password}
+            onChange={handleChange}
+            autoComplete="new-password"
+            hint="Use at least 8 characters."
+            trailing={toggle}
+            required
+          />
+          <FloatingInput
+            label="Confirm password"
+            name="password2"
+            type={showPw ? "text" : "password"}
+            value={formData.password2}
+            onChange={handleChange}
+            autoComplete="new-password"
+            error={mismatch}
+            hint={mismatch ? "Passwords don't match." : undefined}
+            required
+          />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                required
-              />
-            </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-600"
+          >
+            {loading && (
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+            )}
+            {loading ? "Creating account..." : "Create account"}
+          </button>
+        </form>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  First Name
-                </label>
-                <input
-                  type="text"
-                  name="first_name"
-                  value={formData.first_name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Last Name
-                </label>
-                <input
-                  type="text"
-                  name="last_name"
-                  value={formData.last_name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                name="password2"
-                value={formData.password2}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? "Registering..." : "Register"}
-            </button>
-          </form>
-
-          <p className="mt-4 text-center text-gray-400">
-            Already have an account?{" "}
-            <Link to="/login" className="text-blue-400 hover:text-blue-300">
-              Login here
-            </Link>
-          </p>
-        </div>
+        <p className="mt-5 text-center text-gray-400">
+          Already have an account?{" "}
+          <Link to="/login" className="text-blue-400 hover:text-blue-300">
+            Sign in
+          </Link>
+        </p>
       </div>
     </div>
   );
