@@ -10,6 +10,7 @@ import RegisterPage from "./Pages/RegisterPage";
 import HistoryPage from "./Pages/HistoryPage";
 import ProfilePage from "./Pages/ProfilePage";
 import { AuthProvider } from "./context/AuthContext";
+import ScrollToTop from "./utils/ScrollToTop";
 
 import StarField from "./Components/StarField";
 import { Outlet } from "react-router-dom";
@@ -30,6 +31,8 @@ const App: React.FC = () => (
       <div className="min-h-screen flex flex-col bg-slate-900">
         <Header />
         <main className="flex-grow">
+          <ScrollToTop />
+
           <Routes>
             <Route element={<StarLayout />}>
               <Route path="/" element={<LandingPage />} />
